@@ -1,0 +1,263 @@
+require("dotenv").config();
+
+const express = require("express");
+const cors = require("cors");
+const imaps = require("imap-simple");
+const nodemailer = require("nodemailer");
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static("."));
+
+const EMAIL = process.env.EMAIL_USER;
+const PASS = process.env.EMAIL_PASS;
+
+/* =========================
+   IMAP CONFIG
+========================= */
+const imapConfig = {
+  imap: {
+    user: EMAIL,
+    password: PASS,
+    host: "imap.gmail.com",
+    port: 993,
+    tls: true,
+    authTimeout: 15000
+  }
+};
+
+/* =========================
+   CLEAN EMAIL PARSER
+========================= */
+function decodeEmail(raw = "") {
+  let text = String(raw);
+
+  // fix quoted-printable encoding (=3D etc)
+  text = text
+    .replace(/=3D/g, "=")
+    .replace(/=0A/g, "\n")
+    .replace(/=0D/g, "")
+    .replace(/=\r?\n/g, "");
+
+  // strip scripts/styles first
+  text = text.replace(/<script[\s\S]*?<\/script>/gi, "");
+  text = text.replace(/<style[\s\S]*?<\/style>/gi, "");
+
+  // convert HTML → text
+  text = text
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]*>/g, "");
+
+  // cleanup spam headers
+  text = text
+    .replace(/Content-Type:[^\n]+/gi, "")
+    .replace(/Content-Transfer-Encoding:[^\n]+/gi, "")
+    .trim();
+
+  return text;
+}
+
+/* =========================
+   GET EMAILS (CLEAN + SORT SAFE)
+========================= */
+app.get("/emails", async (req, res) => {
+  try {
+    const conn = await imaps.connect(imapConfig);
+    await conn.openBox("INBOX");
+
+    const messages = await conn.search(["ALL"], {
+      bodies: ["HEADER.FIELDS (FROM SUBJECT DATE)", "TEXT"],
+      markSeen: false
+    });
+
+    const emails = messages.slice(-60).map(m => {
+      const headerPart = m.parts.find(p => p.which.includes("HEADER"));
+      const bodyPart = m.parts.find(p => p.which === "TEXT");
+
+      const header = headerPart?.body || {};
+      const rawBody = bodyPart?.body || "";
+
+      return {
+        subject: header.subject?.[0] || "(no subject)",
+        from: header.from?.[0] || "unknown",
+        date: header.date?.[0] || "",
+        body: decodeEmail(rawBody).slice(0, 5000)
+      };
+    });
+
+    conn.end();
+
+    res.json({ messages: emails });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+/* =========================
+   SEND EMAIL
+========================= */
+app.post("/send", async (req, res) => {
+  const { to, subject, body } = req.body;
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: EMAIL,
+      pass: PASS
+    }
+  });
+
+  try {
+    await transporter.sendMail({
+      from: EMAIL,
+      to,
+      subject,
+      text: body
+    });
+
+    res.json({ status: "sent" });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+/* =========================
+   START SERVER
+========================= */
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🔥 Mmail running on http://localhost:3000");
+});require("dotenv").config();
+
+const express = require("express");
+const cors = require("cors");
+const imaps = require("imap-simple");
+const nodemailer = require("nodemailer");
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static("."));
+
+const EMAIL = process.env.EMAIL_USER;
+const PASS = process.env.EMAIL_PASS;
+
+/* =========================
+   IMAP CONFIG
+========================= */
+const imapConfig = {
+  imap: {
+    user: EMAIL,
+    password: PASS,
+    host: "imap.gmail.com",
+    port: 993,
+    tls: true,
+    authTimeout: 15000
+  }
+};
+
+/* =========================
+   CLEAN EMAIL PARSER
+========================= */
+function decodeEmail(raw = "") {
+  let text = String(raw);
+
+  // fix quoted-printable encoding (=3D etc)
+  text = text
+    .replace(/=3D/g, "=")
+    .replace(/=0A/g, "\n")
+    .replace(/=0D/g, "")
+    .replace(/=\r?\n/g, "");
+
+  // strip scripts/styles first
+  text = text.replace(/<script[\s\S]*?<\/script>/gi, "");
+  text = text.replace(/<style[\s\S]*?<\/style>/gi, "");
+
+  // convert HTML → text
+  text = text
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]*>/g, "");
+
+  // cleanup spam headers
+  text = text
+    .replace(/Content-Type:[^\n]+/gi, "")
+    .replace(/Content-Transfer-Encoding:[^\n]+/gi, "")
+    .trim();
+
+  return text;
+}
+
+/* =========================
+   GET EMAILS (CLEAN + SORT SAFE)
+========================= */
+app.get("/emails", async (req, res) => {
+  try {
+    const conn = await imaps.connect(imapConfig);
+    await conn.openBox("INBOX");
+
+    const messages = await conn.search(["ALL"], {
+      bodies: ["HEADER.FIELDS (FROM SUBJECT DATE)", "TEXT"],
+      markSeen: false
+    });
+
+    const emails = messages.slice(-60).map(m => {
+      const headerPart = m.parts.find(p => p.which.includes("HEADER"));
+      const bodyPart = m.parts.find(p => p.which === "TEXT");
+
+      const header = headerPart?.body || {};
+      const rawBody = bodyPart?.body || "";
+
+      return {
+        subject: header.subject?.[0] || "(no subject)",
+        from: header.from?.[0] || "unknown",
+        date: header.date?.[0] || "",
+        body: decodeEmail(rawBody).slice(0, 5000)
+      };
+    });
+
+    conn.end();
+
+    res.json({ messages: emails });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+/* =========================
+   SEND EMAIL
+========================= */
+app.post("/send", async (req, res) => {
+  const { to, subject, body } = req.body;
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: EMAIL,
+      pass: PASS
+    }
+  });
+
+  try {
+    await transporter.sendMail({
+      from: EMAIL,
+      to,
+      subject,
+      text: body
+    });
+
+    res.json({ status: "sent" });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
+/* =========================
+   START SERVER
+========================= */
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🔥 Mmail running on http://localhost:3000");
+});

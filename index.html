@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Mmail</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  display: flex;
+  height: 100vh;
+  background: #f1f3f4;
+}
+
+.sidebar {
+  width: 240px;
+  background: #202124;
+  color: white;
+  padding: 16px;
+}
+
+button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border: none;
+  background: #1a73e8;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#inbox {
+  flex: 1;
+  overflow: auto;
+}
+
+.email {
+  background: white;
+  margin: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.compose {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 350px;
+  background: white;
+  padding: 10px;
+  display: none;
+  border-radius: 10px;
+}
+
+input, textarea {
+  width: 100%;
+  margin: 5px 0;
+  padding: 8px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <h3>Mmail</h3>
+  <button onclick="login()">Login</button>
+  <button onclick="load()">Refresh</button>
+  <button onclick="openCompose()">Compose</button>
+</div>
+
+<div class="main">
+  <div id="inbox"></div>
+</div>
+
+<div class="compose" id="compose">
+  <input id="to" placeholder="To">
+  <input id="subject" placeholder="Subject">
+  <textarea id="body" placeholder="Message"></textarea>
+  <button onclick="send()">Send</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAWpjajZEroNM8O9xOfPyEODM64AwQcVM0",
+  authDomain: "mmail-f64e9.firebaseapp.com",
+  projectId: "mmail-f64e9"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+const API = "https://YOUR-RAILWAY-URL.up.railway.app";
+
+let cache = [];
+
+window.login = async () => {
+  const provider = new GoogleAuthProvider();
+  const res = await signInWithPopup(auth, provider);
+  const token = await res.user.getIdToken();
+  localStorage.setItem("token", token);
+};
+
+window.load = async () => {
+  const r = await fetch(API + "/emails", {
+    headers: {
+      Authorization: "Bearer " + localStorage.getItem("token")
+    }
+  });
+
+  const data = await r.json();
+  cache = data.messages;
+
+  const inbox = document.getElementById("inbox");
+  inbox.innerHTML = "";
+
+  cache.forEach((m, i) => {
+    const div = document.createElement("div");
+    div.className = "email";
+    div.innerHTML = `<b>${m.subject}</b><br>${m.from}`;
+
+    div.onclick = () => {
+      const w = window.open();
+      w.document.write(`
+        <h2>${m.subject}</h2>
+        <iframe style="width:100%;height:90vh;border:none"
+        sandbox srcdoc="${m.html.replace(/"/g, '&quot;')}"></iframe>
+      `);
+    };
+
+    inbox.appendChild(div);
+  });
+};
+
+window.openCompose = () => {
+  document.getElementById("compose").style.display = "block";
+};
+
+window.send = async () => {
+  await fetch(API + "/send", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify({
+      to: to.value,
+      subject: subject.value,
+      body: body.value
+    })
+  });
+
+  document.getElementById("compose").style.display = "none";
+};
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Mmail</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  display: flex;
+  height: 100vh;
+  background: #f1f3f4;
+}
+
+.sidebar {
+  width: 240px;
+  background: #202124;
+  color: white;
+  padding: 16px;
+}
+
+button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border: none;
+  background: #1a73e8;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#inbox {
+  flex: 1;
+  overflow: auto;
+}
+
+.email {
+  background: white;
+  margin: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.compose {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 350px;
+  background: white;
+  padding: 10px;
+  display: none;
+  border-radius: 10px;
+}
+
+input, textarea {
+  width: 100%;
+  margin: 5px 0;
+  padding: 8px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <h3>Mmail</h3>
+  <button onclick="login()">Login</button>
+  <button onclick="load()">Refresh</button>
+  <button onclick="openCompose()">Compose</button>
+</div>
+
+<div class="main">
+  <div id="inbox"></div>
+</div>
+
+<div class="compose" id="compose">
+  <input id="to" placeholder="To">
+  <input id="subject" placeholder="Subject">
+  <textarea id="body" placeholder="Message"></textarea>
+  <button onclick="send()">Send</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAWpjajZEroNM8O9xOfPyEODM64AwQcVM0",
+  authDomain: "mmail-f64e9.firebaseapp.com",
+  projectId: "mmail-f64e9"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+const API = "https://YOUR-RAILWAY-URL.up.railway.app";
+
+let cache = [];
+
+window.login = async () => {
+  const provider = new GoogleAuthProvider();
+  const res = await signInWithPopup(auth, provider);
+  const token = await res.user.getIdToken();
+  localStorage.setItem("token", token);
+};
+
+window.load = async () => {
+  const r = await fetch(API + "/emails", {
+    headers: {
+      Authorization: "Bearer " + localStorage.getItem("token")
+    }
+  });
+
+  const data = await r.json();
+  cache = data.messages;
+
+  const inbox = document.getElementById("inbox");
+  inbox.innerHTML = "";
+
+  cache.forEach((m, i) => {
+    const div = document.createElement("div");
+    div.className = "email";
+    div.innerHTML = `<b>${m.subject}</b><br>${m.from}`;
+
+    div.onclick = () => {
+      const w = window.open();
+      w.document.write(`
+        <h2>${m.subject}</h2>
+        <iframe style="width:100%;height:90vh;border:none"
+        sandbox srcdoc="${m.html.replace(/"/g, '&quot;')}"></iframe>
+      `);
+    };
+
+    inbox.appendChild(div);
+  });
+};
+
+window.openCompose = () => {
+  document.getElementById("compose").style.display = "block";
+};
+
+window.send = async () => {
+  await fetch(API + "/send", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + localStorage.getItem("token")
+    },
+    body: JSON.stringify({
+      to: to.value,
+      subject: subject.value,
+      body: body.value
+    })
+  });
+
+  document.getElementById("compose").style.display = "none";
+};
+</script>
+
+</body>
+</html>
