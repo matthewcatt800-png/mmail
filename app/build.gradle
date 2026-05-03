@@ -4,7 +4,6 @@ plugins {
 
 android {
     namespace "com.mmail.app"
-    namespace "com.mmail.app"
     compileSdk 34
 
     defaultConfig {
