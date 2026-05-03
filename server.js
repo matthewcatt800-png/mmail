@@ -1,49 +1,42 @@
 const express = require("express");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
-const admin = require("firebase-admin");
 
 const app = express();
 
-/* ---------------- MIDDLEWARE ---------------- */
 app.use(cors());
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json());
 
-/* ---------------- FIREBASE ADMIN ---------------- */
-admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
+/* ---------------- MEMORY INBOX (replace later with DB) ---------------- */
+let emails = [];
+
+/* ---------------- HEALTH CHECK ---------------- */
+app.get("/", (req, res) => {
+  res.json({ status: "Mmail backend running" });
 });
 
-/* ---------------- AUTH MIDDLEWARE ---------------- */
-async function verifyToken(req, res, next) {
-  try {
-    const header = req.headers.authorization || "";
-    const token = header.split("Bearer ")[1];
-
-    if (!token) {
-      return res.status(401).json({ error: "Missing token" });
-    }
-
-    req.user = await admin.auth().verifyIdToken(token);
-    next();
-  } catch (err) {
-    res.status(401).json({ error: "Invalid token" });
-  }
-}
-
-/* ---------------- EMAIL TRANSPORT ---------------- */
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
+/* ---------------- GET EMAILS (latest first) ---------------- */
+app.get("/emails", (req, res) => {
+  const sorted = [...emails].sort((a, b) => b.timestamp - a.timestamp);
+  res.json(sorted);
 });
 
 /* ---------------- SEND EMAIL ---------------- */
-app.post("/send", verifyToken, async (req, res) => {
+app.post("/send", async (req, res) => {
+  const { to, subject, body } = req.body;
+
+  if (!to || !subject || !body) {
+    return res.status(400).json({ error: "Missing fields" });
+  }
+
   try {
-    const { to, subject, body } = req.body;
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
@@ -53,28 +46,22 @@ app.post("/send", verifyToken, async (req, res) => {
       html: body
     });
 
+    emails.push({
+      id: Date.now(),
+      from: process.env.EMAIL_USER,
+      to,
+      subject,
+      html: body,
+      timestamp: Date.now()
+    });
+
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (e) {
+    res.status(500).json({ error: "send failed" });
   }
 });
 
-/* ---------------- MOCK EMAIL LIST (REPLACE LATER WITH IMAP) ---------------- */
-app.get("/emails", verifyToken, async (req, res) => {
-  res.json({
-    messages: [
-      {
-        from: "Firebase <no-reply@firebase.com>",
-        subject: "Welcome to Mmail",
-        html: "<h2>It works 🎉</h2><p>Your system is live.</p>",
-        date: Date.now()
-      }
-    ]
-  });
-});
-
-/* ---------------- START SERVER ---------------- */
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("Mmail backend running on", PORT);
 });
